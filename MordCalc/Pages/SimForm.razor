@@ -1,0 +1,20 @@
+﻿<EditForm Model="@simParam">
+  <div>
+    <div>
+      <label class="form-label" for="n">Number of iterations</label>
+      <InputNumber id="n" @bind-Value=simParam.number ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="n">Ignore charger goes first</label>
+      <InputCheckbox id="n" @bind-Value=simParam.IgnoreCharge />
+    </div>
+  </div>
+</EditForm>
+
+@code {
+  [Parameter]
+  public SimParam simParam { set; get; }
+  [Parameter]
+  public EventCallback<SimParam> simParamChanged { get; set; }
+
+}

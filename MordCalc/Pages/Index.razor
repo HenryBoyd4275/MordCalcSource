@@ -1,0 +1,910 @@
+﻿@page "/"
+
+<div style="display:inline-flex">
+  <div class="form-wrapper" style="float:left">
+    <MordCalc.Pages.WarriorForm @bind-warrior=w1 name="Charging Model" />
+  </div>
+  <div style="padding:1rem;">
+    <button style="height: 4rem;" @onclick="Swap"><- SWAP -></-></button>
+  </div>
+  <div class="form-wrapper" style="float:right; padding-right:5rem">
+    <MordCalc.Pages.WarriorForm @bind-warrior=w2 name="Defending Model" />
+  </div>
+</div>
+
+<MordCalc.Pages.SimForm @bind-simParam="sp" />
+
+<!--<button @onclick="ComputeWithLog">1 with log</button>-->
+<button @onclick="Compute">Calculate!</button>
+
+<h4>Charging Model win: @(w1Wins/ (sp.number / 100))%</h4>
+<h4>Defending Model win: @(w2Wins/(sp.number/100))%</h4>
+<h4>Average battle length: @(totalRounds/sp.number)</h4>
+
+<p>
+  Hand weapon has no bonus or penalty, use it for like dogs or monks or whatever.<br />
+  *Remember to alter the SV stat to reflect your armour save! equipping a shield will not do that by itself!*<br />
+  Step aside adds more length to the calc than one would expect<br />
+  Known issues: <br />- Black lotus hits can't be parried <br />- no offhand rapier support <br/>- weapon injury affects apply to first round pistol wounds<br/>
+</p>
+
+<p>
+  Changelog: <br/>
+  - added parry on ties ability <br/>
+  - fixed parrying an offhand hit also removing a mainhand hit <br/>
+  - fixed offhand poison not being correctly applied <br/>
+  - started a big ol refactor. There is a lot of code still not moved into the functions. Offhand stuff messes everythig up. <br/>
+  - added wraithtouch <br/>
+  - fixed posion without hatred <br/>
+  - added -1 to hit ability <br/>
+  - pistol wounds no longer benefit from held weapon injury bonuses <br/>
+  - knocked down model correctly go OOA on unsaved wounds <br/>
+  - Pistol's added <br/>
+  - Frenzy works properly now <br/>
+  - Added art of silent death <br/>
+  - Hatred no longer doubles poison chance
+</p>
+
+@code {
+
+  //beastlash, steel whip, xbow pistol
+  //darksteel/obsidian/ithilmar/gromil
+  //add house rules to sim form
+  //responsive css: mobile should be stacked vertically and have skills under collapsable element
+  //check if offhand poison is carrying through correctly
+  //create final injury function
+
+  SimParam sp = new();
+
+  public int combatRound;
+  //bool log = false;
+
+  Random rnd = new Random();
+
+  Warrior w1 = new Warrior();
+  Warrior w2 = new Warrior();
+
+  float w1Wins = 0;
+  float w2Wins = 0;
+  float totalRounds = 0;
+
+  int hp1;
+  int hp2;
+  bool f1;
+  bool f2;
+
+  public void Swap()
+  {
+    Warrior temp = w1;
+    w1 = w2;
+    w2 = temp;
+    StateHasChanged();
+  }
+
+  public void Compute()
+  {
+    hp1 = w1.W;
+    hp2 = w2.W;
+    f1 = w1.Frenzy;
+    f2 = w2.Frenzy;
+    w1Wins = 0;
+    w2Wins = 0;
+    totalRounds = 0;
+    //log = false;
+    for (int i = 1; i < sp.number; i++)
+    {
+      combatRound = 0;
+      w1.status = 0;
+      w2.status = 0;
+      w1.W = hp1;
+      w2.W = hp2;
+      w1.Frenzy = f1;
+      w2.Frenzy = f2;
+      if (Battle() == 1)
+      {
+        w1Wins++;
+        totalRounds += combatRound;
+      }
+      else
+      {
+        w2Wins++;
+        totalRounds += combatRound;
+      }
+    }
+    w1.Frenzy = f1;
+    w2.Frenzy = f2;
+    w1.W = hp1;
+    w2.W = hp2;
+    StateHasChanged();
+  }
+
+  /*public void Logger(string str)
+  {
+    if (log)
+    {
+      Console.WriteLine(str);
+    }
+  }*/
+
+
+  /*public void ComputeWithLog()
+  {
+    hp1 = w1.W;
+    hp2 = w2.W;
+
+    Console.WriteLine($"w1:{w1.W},  w2:{w2.W},  hp1:{hp1},  hp2:{hp2}");
+    //Logger($"w1:{w1.W},  w2:{w2.W},  hp1:{hp1},  hp2:{hp2}");
+    //log = true;
+    combatRound = 0;
+    w1.status = 0;
+    w2.status = 0;
+    if (Battle() == 1)
+    {
+      //Logger($"Warrior 1 wins on round {combatRound}");
+    }
+    else
+    {
+      //Logger($"Warrior 2 wins on round {combatRound}");
+    }
+    w1.W = hp1;
+    w2.W = hp2;
+    Console.WriteLine($"w1:{w1.W},  w2:{w2.W},  hp1:{hp1},  hp2:{hp2}");
+    StateHasChanged();
+  }*/
+
+  public int Battle()
+  {
+    while (true)
+    {
+      int attacker = CalcAttacker();
+      combatRound++;
+      if (combatRound % 2 == 1)
+      {
+        //Logger("Warrior 1 status decay");
+        w1.status--;
+      }
+      else
+      {
+        //Logger("Warrior 2 status decay");
+        w2.status--;
+      }
+      //Logger($"w1 status = {w1.status}, w2 status = {w2.status}");
+      if (attacker == 1)
+      {
+        //Logger("warrior 1 attacks!");
+        w2.status = AttackSequence(w1, w2);//attack sequence returns the worst injury for that round of attacks
+        if (w2.status > 2)
+        {
+          //Logger("Warrior 1 wins!");
+          return 1;
+        }
+        //Logger("warrior 2 fights back!");
+        w1.status = AttackSequence(w2, w1);
+        if (w1.status > 2)
+        {
+          //Logger("Warrior 2 wins!");
+          return 2;
+        }
+      }
+      else
+      {
+        //Logger("warrior 2 attacks!");
+        w1.status = AttackSequence(w2, w1);
+        if (w1.status > 2)
+        {
+          //Logger("Warrior 2 wins!");
+          return 2;
+        }
+        //Logger("warrior 1 fights back!");
+        w2.status = AttackSequence(w1, w2);
+        if (w2.status > 2)
+        {
+          //Logger("Warrior 1 wins!");
+          return 1;
+        }
+      }
+    }
+  }
+
+  int hits = 0;
+  int lowHit = 7;
+
+  public int CalcAttacker()
+  {
+    if (combatRound == 0)
+    {//if its the charge round
+      if (w2.MainWeapon != Weapons.Halberd && w2.MainWeapon != Weapons.Spear && (w1.MainWeapon != Weapons.DoubleHandedWeapon || w1.Strong) && w2.Reflex == false && !sp.IgnoreCharge)
+      {//if there's no weapon that makes the charge a moot point
+        //Logger("Charging model goes first");
+        return 1;
+      }
+    }
+    if (w1.status > 0)
+    {
+      //Logger("w1 status, w2 goes first");
+      return 2;
+    }
+    else if (w2.status > 0)
+    {
+      //Logger("w2 status, w1 goes first");
+      return 1;
+    }
+
+    if (w1.MainWeapon == Weapons.DoubleHandedWeapon && w2.MainWeapon != Weapons.DoubleHandedWeapon && !w1.Strong && combatRound != 0)
+    {
+      return 2;
+    }
+    if (w2.MainWeapon == Weapons.DoubleHandedWeapon && w1.MainWeapon != Weapons.DoubleHandedWeapon && !w2.Strong)
+    {
+      return 1;
+    }
+
+    if (w1.I == w2.I)
+    {
+      //Logger("random model goes first");
+      int roll = rnd.Next(1, 3);
+      //Logger($"rolled a {roll}");
+      return roll;
+    }
+    else if (w1.I > w2.I)
+    {
+      //Logger("w1 goes first");
+      return 1;
+    }
+    else
+    {
+      //Logger("w2 goes first");
+      return 2;
+    }
+  }
+
+  int wounds = 0;
+  int r = 1;
+  bool offlow = false;
+  bool offPoison = false;
+  bool offHand;
+  bool offcrit = false;
+  int injury = 0;
+
+  public int AttackSequence(Warrior a, Warrior d)
+  {
+    wounds = 0;
+    injury = 0;
+    offlow = false;
+    offPoison = false;
+    offcrit = false;
+    //bool pHit = false;
+    if (a.Offhand != Weapons.None && a.Offhand != Weapons.Shield && a.Offhand != Weapons.Buckler)
+    {
+      //Logger("there is an offhand attack");
+      offHand = true;
+    }
+    else
+    {
+      //Logger("there is no offhand attack");
+      offHand = false;
+    }
+    int sb = CalcStrengthBonus(a);
+    if (a.status > 0)
+    {//skip attack if injured
+      //Logger("model may not attack due to injury status");
+      return 0;
+    }
+    if (d.status > 1)
+    {
+      //Logger("stunned defender taken out of action");
+      return 3;
+    }
+    hits = 0;
+    lowHit = 7;
+    if (d.status == 1)
+    {//if enemy knocked down all attacks hit
+      //Logger("knocked down enemy auto hit");
+      hits = a.A;
+    }
+    else
+    {
+      for (int i = 0; i < ((a.Frenzy)?(2*a.A):(a.A)); i++)
+      {
+        ToHit(a, d);
+      }
+      if (offHand)
+      {
+        ToHit(a, d, 1, true);
+        /*
+        int roll = rnd.Next(1, 7);
+        Logger($"offhand rolled {roll} to hit");
+        if (a.Hatred && combatRound == 1)
+        {
+
+          int reroll = rnd.Next(1, 7);
+          Logger($"rolled a {reroll} for hatred offhand");
+          if (reroll > roll)
+          {
+            roll = reroll;
+          }
+        }
+        if (roll < (getHitTarget(a, d) + 1))
+        {//off hand to hit
+          Logger("offhand missed");
+          if (roll < lowHit)
+          {
+            lowHit = roll;
+            offlow = true;
+          }
+          offHand = false;//this means we missed, otherwise leave it true
+        }
+        else
+        {
+          if (a.BlackLotusO && roll == 6 && !(a.Hatred && combatRound == 1 && (rnd.Next(1,3) > 1)))
+          {
+            Logger("auto wound on a 6 because reasons");
+            //erase the hit we don't need to test this to wound
+            //check to see if this crits
+            int roll1 = rnd.Next(1, 7);
+            if (roll1 == 6)
+            {//check for crit on auto wound thing
+              offcrit = true;//offcrit
+            }
+          }
+          Logger("offhand hit");
+        }*/
+      }
+      if ((hits > 0 || offHand) && (d.MainWeapon == Weapons.Rapier || d.MainWeapon == Weapons.DragonSword || d.MainWeapon == Weapons.Sword || d.Offhand == Weapons.Sword || d.Offhand == Weapons.Buckler) && d.status < 1)
+      {
+        if (CheckParry(a, d, lowHit))
+        {
+          if (offlow)
+          {
+            //Logger("offhand parried");
+            offHand = false;
+          } else
+          {
+            hits--;
+          }
+          //Logger("parry succeeded");
+        }
+      }
+
+      if (hits < 1 && offHand == false && !a.BlackLotusO && !a.BlackLotusP)
+      {
+        //Logger("No Hits");
+        return 0;
+      }
+    }
+    int initial = hits;
+    if (a.Wraith && hits > 0)
+    {
+      wounds++;
+      //Logger("Wraithtouch - auto wounded");
+    }
+    else
+    {
+      for (int i = 0; i < hits; i++)
+      {//roll to-wounds
+        ToWound(a, d, i);
+      }
+    }
+
+    if (offHand && !offPoison)
+    {
+      int roll = rnd.Next(1, 7);
+      //Logger($"off hand rolled {roll} to wound");
+      int tempS = a.S;
+      if (a.OffPistol && combatRound == 1)
+      {
+        //Logger("pistol detected, S set to 4");
+        a.S = 4;
+      }
+      if (roll < (5 - a.S + d.T) && roll > 1)
+      {
+        //Logger("offhand failed to wound");
+        offHand = false;
+      }
+      else
+      {
+        if (((4 - a.S + d.T) < 6 && roll == 6) || ((a.Art && (4 - a.S - sb + d.T) < 5 && roll == 5)))
+        {
+          //Logger("offhand crit!");
+          offcrit = true;
+        }
+        //Logger("offhand wound");
+      }
+      if (a.OffPistol && combatRound == 1)
+      {
+        //Logger("pistol removed, S returned");
+        a.S = tempS;
+      }
+    }
+    if (wounds < 1 && offHand == false)
+    {
+      //Logger("No Wounds");
+      return 0;
+    }
+    for (int i = 0; i < wounds; i++)
+    {//armour saves
+      ArmourSave(a, d, i);
+    }
+    if (offHand)
+    {/*
+      ArmourSave(a, d, 0, true);
+      int dagger = 0;
+      if (a.Offhand == Weapons.Dagger || a.Offhand == Weapons.Rapier || a.Offhand == Weapons.Beastlash)
+      {
+        dagger = 1;
+      }
+      int armourPen = 0;
+      if (a.S > 3)
+      {
+        armourPen = a.S - 3;
+        if (a.OffPistol && combatRound == 1)
+        {
+          //Logger("pistol detected, armour reduced");
+          armourPen++;
+        }
+      }
+      if (offcrit)
+      {
+        int roll1 = rnd.Next(1, 7);
+        //Logger($"rolled a {roll1} for armour vs {d.SV + armourPen}");
+
+        if (roll1 < (d.SV + armourPen - dagger) || roll1 == 1)
+        {
+          //Logger("offhand crit save failed");
+          if (!StepAside(d))
+          {
+            d.W--;
+          }
+        }
+        else
+        {
+          //Logger("offhand crit wound saved");
+          offcrit = false;
+        }
+      }
+      int roll = rnd.Next(1, 7);
+      //Logger($"rolled a {roll} for armour vs {d.SV + armourPen}");
+      if (roll < (d.SV + armourPen - dagger) || roll == 1)
+      {
+        //Logger("offhand save failed");
+        if (!StepAside(d))
+        {
+          d.W--;
+        }
+      }
+      else
+      {
+        //Logger("offhand wound saved");
+        offHand = false;
+      }*/
+    }
+    if (d.W > 0)
+    {
+      //Logger("defender still has wounds, skipping injury");
+      return 0;
+    }
+    if (injury > 0 && d.status > 0)
+    {
+      //Logger("unsaved wound takes knocked down model out of action");
+      return 3;
+    }
+    int finalInjury = 0;
+    for (int i = 0; i < injury; i++)
+    {//injury rolls
+      int roll = rnd.Next(1, 7);
+      //Logger($"rolled a {roll} for injury");
+      if (roll + InjuryBonus(a, d) > 4)//ooa
+      {
+        //Logger("out of action");
+        finalInjury = 3;
+      }
+      else if (roll + InjuryBonus(a, d, true) > 2)//stun
+      {
+        //Logger("stunned");
+        if (finalInjury < 2)
+        {
+          finalInjury = 2;
+          if (d.NoStun)
+          {
+            finalInjury = 1;
+          }
+          if (d.Helmet && rnd.Next(1, 7) > 3)
+          {
+            //Logger("helmet save made!");
+            finalInjury = 1;
+          }
+        }
+      }
+      else//knocked down
+      {
+        //Logger("knocked down");
+        if (finalInjury < 1)
+        {
+          finalInjury = 1;
+        }
+      }
+    }
+    if (offcrit)
+    {
+      int roll1 = rnd.Next(1, 7);
+      //Logger($"rolled a {roll1} for offhand injury");
+      if (roll1 + InjuryBonus(a, d, false, true) > 4)//ooa
+      {
+        //Logger("out of action");
+        finalInjury = 3;
+      }
+      else if (roll1 + InjuryBonus(a, d, true, true) > 2)//stun
+      {
+        //Logger("stunned");
+        if (finalInjury < 2)
+        {
+          finalInjury = 2;
+          if (d.NoStun)
+          {
+            finalInjury = 1;
+          }
+          if (d.Helmet && rnd.Next(1, 7) > 3)
+          {
+            //Logger("helmet save made!");
+            finalInjury = 1;
+          }
+        }
+      }
+      else//knocked down
+      {
+        //Logger("knocked down");
+        if (finalInjury < 1)
+        {
+          finalInjury = 1;
+        }
+      }
+    }
+    if (offHand)
+    {
+      int roll = rnd.Next(1, 7);
+      //Logger($"rolled a {roll} for offhand injury");
+      if (roll > ((a.Offhand == Weapons.Axe) ? 3 : 4))//ooa
+      {
+        //Logger("out of action");
+        finalInjury = 3;
+      }
+      else if (roll > ((a.Offhand == Weapons.Axe || a.Offhand == Weapons.Club) ? 1 : 2))//stun
+      {
+        //Logger("stunned");
+        if (finalInjury < 2)
+        {
+          finalInjury = 2;
+          if (d.NoStun)
+          {
+            finalInjury = 1;
+          }
+          if (d.Helmet && rnd.Next(1, 7) > 3)
+          {
+            //Logger("helmet save made!");
+            finalInjury = 1;
+          }
+        }
+      }
+      else//knocked down
+      {
+        //Logger("knocked down");
+        if (finalInjury < 1)
+        {
+          finalInjury = 1;
+        }
+      }
+    }
+    if (d.Frenzy == true && finalInjury > 0)
+    {
+      d.Frenzy = false;
+    }
+    return finalInjury;
+  }
+
+  public void ToWound(Warrior a, Warrior d, int i)
+  {
+    int sb = CalcStrengthBonus(a);
+    //set S to 4 if round 1 and pistol
+    int tempS = a.S;
+    if (i == 0 && a.MainPistol && combatRound == 1)
+    {
+      //Logger("pistol detected, S set to 4");
+      a.S = 4;
+    }
+    int roll = rnd.Next(1, 7);
+    //Logger($"rolled a {roll} to wound");
+    if (roll >= (4 - a.S - sb + d.T) && roll > 1)
+    {
+      //Logger("Hit wounds");
+      r = 0;
+      if (((4 - a.S - sb + d.T) < 6 && roll == 6) || (a.Art && (4 - a.S - sb + d.T) < 5 && roll == 5))
+      {
+        //Logger("crit!");
+        wounds++;
+      }
+      wounds++;
+    }
+    else
+    {
+      //Logger("hit not wound");
+      if (a.MainWeapon == Weapons.Rapier)
+      {
+        ToHit(a, d, r);
+        r++;
+      }
+    }
+    if (i == 0 && a.MainPistol && combatRound == 1)
+    {
+      //Logger("pistol removed, S returned");
+      a.S = tempS;
+    }
+  }
+
+  public void ToHit(Warrior a, Warrior d, int penalty = 0, bool oh = false)
+  {
+    int hit;
+    if (d.Flies)
+    {
+      penalty++;
+    }
+    hit = rnd.Next(1, 7);
+    // if (oh) { Logger("Rolling offhand tohit"); }
+    // Logger($"rolled a {hit} to hit");
+    if (a.Hatred && combatRound == 1)
+    {
+      int reroll = rnd.Next(1, 7);
+      //Logger($"rolled a {reroll} for hatred");
+      if (reroll > hit)
+      {
+        hit = reroll;
+      }
+    }
+    if (hit - penalty >= getHitTarget(a, d))
+    {//roll to-hits
+      if (hit < lowHit)
+      {
+        lowHit = hit;
+        if (oh)
+        {
+          offlow = true;
+        }
+      }
+      //Logger("Attack Hit");
+      if(!oh)
+      {//we track offhand seperate so we don't want to add a hit in that case and just leave offhand as true
+        hits++;
+      }
+
+      if (hit == 6 && ((!oh && a.BlackLotusP) || (oh && a.BlackLotusO)) && !(a.Hatred && combatRound == 1 && (rnd.Next(1, 3) > 1)))
+      {
+        //Logger("auto wound on a 6");
+        hits--;//erase the hit we don't need to test this to wound
+               //check to see if this crits
+        int roll = rnd.Next(1, 7);
+        if (roll == 6)
+        {
+          //Logger("auto wound on a 6 crit");
+          wounds++;//crit for 2
+        }
+        if (oh)
+        {
+          offPoison = true;
+        }
+        else
+        {//we track offhand different so we don't want to add a main wound in that case
+          wounds++;
+        }
+      }
+    }
+    else
+    {
+      if (oh)
+      {
+        offHand = false;
+      }
+      //Logger("Attack Miss");
+      r = 0;
+    }
+  }
+
+  public int getHitTarget(Warrior a, Warrior d)
+  {
+    if (a.WS > d.WS)
+    {
+      //Logger("3 needed to hit");
+      return 3;
+    }
+    else if (a.WS * 2 < d.WS)
+    {
+      //Logger("5 needed to hit");
+      return 5;
+    }
+    else
+    {
+      //Logger("4 needed to hit");
+      return 4;
+    }
+  }
+
+  public int CalcStrengthBonus(Warrior w)
+  {
+    if (w.MainWeapon == Weapons.DoubleHandedWeapon)
+    {
+      //Logger($"a model has an SB of {2}");
+      return 2;
+    }
+    else if (w.MainWeapon == Weapons.Halberd || w.MainWeapon == Weapons.DragonSword)
+    {
+      //Logger($"a model has an SB of {1}");
+      return 1;
+    }
+    else if (w.MainWeapon == Weapons.Flail && combatRound == 1)
+    {
+      //Logger($"a model has an SB of {2} for the first round");
+      return 2;
+    }
+    else if (w.MainWeapon == Weapons.Morningstar && combatRound == 1)
+    {
+      //Logger($"a model has an SB of {1} for the first round");
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+
+  public bool StepAside(Warrior w)
+  {
+    if (w.Step)
+    {
+      int roll = rnd.Next(1, 7);
+      //Logger($"rolled a {roll} to step aside");
+      if (roll > 4)
+      {
+        //Logger("stepped aside!");
+        return true;
+      }
+      else
+      {
+        //Logger("did not step aside");
+        return false;
+      }
+    }
+    else
+    {
+      //Logger("no step aside");
+      return false;
+    }
+  }
+
+  public bool CheckParry(Warrior a, Warrior d, int target)
+  {
+    int roll = rnd.Next(1, 7);
+    if (a.ParryPro)
+    {
+      roll--;
+    }
+    //Logger($"rolled {roll} to parry");
+    if (roll < target)
+    {
+      //Logger("Parry roll passed");
+      return true;
+    }
+    else
+    {
+      if (d.Offhand == Weapons.Buckler && d.MainWeapon == Weapons.Sword && rnd.Next(1, 7) < target)
+      {
+        //Logger("Parry re-roll passed");
+        return true;
+      }
+      //Logger("Parry failed");
+      return false;
+    }
+  }
+
+  public int InjuryBonus(Warrior a, Warrior d, bool knockdown = false, bool offhand = false)
+  {
+    int target = 0;
+    if (offhand)
+    {
+      if (a.Offhand == Weapons.Axe || (a.Offhand == Weapons.Club && knockdown && !d.Dwarf))
+      {
+        target++;
+      }
+    }
+    else
+    {
+      if (a.MainWeapon == Weapons.Axe || (a.MainWeapon == Weapons.Club && knockdown && !d.Dwarf))
+      {
+        target++;
+      }
+    }
+    if ((offhand && a.OffPistol && combatRound == 1) || (!offhand && a.MainPistol && combatRound == 1))
+    {
+      target = 0;//remove weapon bonus when pistol.
+    }
+    if (!knockdown && d.Dwarf)
+    {
+      target--;
+    }
+    if (a.Strike)
+    {
+      target++;
+    }
+    return target;
+  }
+
+  public void ArmourSave(Warrior a, Warrior d, int i, bool oh = false)
+  {
+    int sb = CalcStrengthBonus(a);
+    int roll = rnd.Next(1, 7);
+    int armourPen = 0;
+    if (oh)
+    {
+      if (a.S - 1 + sb > 3)
+      {
+        armourPen = a.S + sb - 3;
+      }
+      if (i == 0 && a.OffPistol && combatRound == 1)
+      {
+        //Logger("offhand pistol detected, armour reduced");
+        armourPen = 2;
+      }
+    }
+    else
+    {
+      if (a.S + sb > 3)
+      {
+        armourPen = a.S + sb - 3;
+      }
+      if (i == 0 && a.MainPistol && combatRound == 1)
+      {
+        //Logger("pistol detected, armour reduced");
+        armourPen = 2;
+      }
+    }
+
+    //Logger($"rolled a {roll} for armour vs {d.SV + armourPen}");
+    int dagger = 0;
+    if (oh)
+    {
+      if (a.Offhand == Weapons.Dagger || a.Offhand == Weapons.Rapier || a.Offhand == Weapons.Beastlash)
+      {
+        dagger = 1;
+      }
+    } else
+    {
+      if (a.MainWeapon == Weapons.Dagger || a.MainWeapon == Weapons.Rapier || a.MainWeapon == Weapons.Beastlash)
+      {
+        dagger = 1;
+      }
+    }
+
+    if (roll < (d.SV + armourPen - dagger) || roll == 1)
+    {
+      //Logger("save failed");
+      if (!StepAside(d))
+      {
+        if (a.Wraith && (a.W < hp1 || a.W < hp2))
+        {
+          a.W++;
+          //Logger("wraithtouch detected, and wound regained");
+        }
+        d.W--;
+        if (!oh)
+        {//we track offhand seperate
+          injury++;
+        }
+      }
+    }
+    else
+    {
+      if (oh)
+      {//remove offhand throughline if it was saved
+        offHand = false;
+      }
+      //Logger("wound saved");
+    }
+  }
+}

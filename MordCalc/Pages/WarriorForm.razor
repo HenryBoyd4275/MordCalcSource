@@ -1,0 +1,143 @@
+﻿<h3>@name</h3>
+
+<EditForm Model="@warrior" class="warrior-form-wrapper">
+  <div class="warrior-form-attributes-wrapper">
+    <div>
+      <label class="form-label" for="ws">WS</label>
+      <InputNumber id="ws" class="form-control" @bind-Value=warrior.WS ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="s">S</label>
+      <InputNumber id="s" class="form-control" @bind-Value=warrior.S ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="t">T</label>
+      <InputNumber id="t" class="form-control" @bind-Value=warrior.T ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="w">W</label>
+      <InputNumber id="w" class="form-control" @bind-Value=warrior.W ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="i">I</label>
+      <InputNumber id="i" class="form-control" @bind-Value=warrior.I ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="a">A</label>
+      <InputNumber id="a" class="form-control" @bind-Value=warrior.A ParsingErrorMessage="Must be an integer value" />
+    </div>
+    <div>
+      <label class="form-label" for="sv">SV</label>
+      <InputNumber id="sv" class="form-control" @bind-Value=warrior.SV ParsingErrorMessage="Must be an integer value" />
+    </div>
+  </div>
+  <div class="warrior-form-equipment-wrapper">
+    <div>
+      <div>
+        <label for="d">Dwarf</label>
+        <InputCheckbox id="d" @bind-Value=warrior.Dwarf />
+      </div>
+      <div>
+        <label for="ns">Immune to Stun</label>
+        <InputCheckbox id="ns" @bind-Value=warrior.NoStun />
+      </div>
+      <div>
+        <label for="h">Helmet</label>
+        <InputCheckbox id="h" @bind-Value=warrior.Helmet />
+      </div>
+      <div>
+        <label for="st">Step Aside</label>
+        <InputCheckbox id="st" @bind-Value=warrior.Step />
+      </div>
+      <div>
+        <label for="sm">Strongman</label>
+        <InputCheckbox id="sm" @bind-Value=warrior.Strong />
+      </div>
+      <div>
+        <label for="e">Lightning Reflexes</label>
+        <InputCheckbox id="e" @bind-Value=warrior.Reflex />
+      </div>
+      <div>
+        <label for="str">Strike To Injure</label>
+        <InputCheckbox id="str" @bind-Value=warrior.Strike />
+      </div>
+      <div>
+        <label for="ha">Hatred</label>
+        <InputCheckbox id="ha" @bind-Value=warrior.Hatred />
+      </div>
+      <div>
+        <label for="fr">Frenzy</label>
+        <InputCheckbox id="fr" @bind-Value=warrior.Frenzy />
+      </div>
+      <div>
+        <label for="hth">-1 to be Hit</label>
+        <InputCheckbox id="hth" @bind-Value=warrior.Flies />
+      </div>
+      <div>
+        <label for="art">Art of Silent Death</label>
+        <InputCheckbox id="art" @bind-Value=warrior.Art />
+      </div>
+      <div>
+        <label for="bl">Black Lotus/Wight Blades (Primary Weapon)</label>
+        <InputCheckbox id="bl" @bind-Value=warrior.BlackLotusP />
+      </div>
+      <div>
+        <label for="bl">Black Lotus/Wight Blades (Offhand Weapon)</label>
+        <InputCheckbox id="bl" @bind-Value=warrior.BlackLotusO />
+      </div>
+      <div>
+        <label for="wr">WraithTouch (make sure A=1)</label>
+        <InputCheckbox id="wr" @bind-Value=warrior.Wraith />
+      </div>
+      <div>
+        <label for="pp">Parry on ties</label>
+        <InputCheckbox id="pp" @bind-Value=warrior.ParryPro />
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="p">Main Weapon</label>
+      <InputSelect id="p" @bind-Value=warrior.MainWeapon>
+        <option value=@Weapons.HandWeapon>Hand-Weapon</option>
+        <option value=@Weapons.Dagger>Dagger</option>
+        <option value=@Weapons.Club>Club/Mace/Hammer</option>
+        <option value=@Weapons.Axe>Axe</option>
+        <option value=@Weapons.Spear>Spear</option>
+        <option value=@Weapons.Sword>Sword</option>
+        <option value=@Weapons.Halberd>Halberd</option>
+        <option value=@Weapons.DoubleHandedWeapon>Double-Handed Weapon</option>
+        <option value=@Weapons.DragonSword>Dragon Sword</option>
+        <option value=@Weapons.Rapier>Rapier</option>
+        <option value=@Weapons.Flail>Flail</option>
+        <option value=@Weapons.Morningstar>Morningstar</option>
+      </InputSelect>
+      <label for="p1">Pistol</label>
+      <InputCheckbox id="p1" @bind-Value=warrior.MainPistol />
+    </div>
+    <div>
+      <label class="form-label" for="o">Off-hand</label>
+      <InputSelect id="o" @bind-Value=warrior.Offhand>
+        <option value=@Weapons.None>None</option>
+        <option value=@Weapons.HandWeapon>Hand-Weapon</option>
+        <option value=@Weapons.Dagger>Dagger</option>
+        <option value=@Weapons.Club>Club/Mace/Hammer</option>
+        <option value=@Weapons.Axe>Axe</option>
+        <option value=@Weapons.Sword>Sword</option>
+        <option value=@Weapons.Shield>Shield</option>
+        <option value=@Weapons.Buckler>Buckler</option>
+      </InputSelect>
+      <label for="p2">Pistol</label>
+      <InputCheckbox id="p2" @bind-Value=warrior.OffPistol />
+    </div>
+  </div>
+</EditForm>
+
+@code {
+  [Parameter]
+  public Warrior warrior { set; get; }
+  [Parameter]
+  public EventCallback<Warrior> warriorChanged { get; set; }
+  [Parameter]
+  public string name { get; set; }
+
+
+}
